@@ -1,0 +1,95 @@
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from scipy import stats
+
+# Optional: Enhance plot aesthetics with Seaborn
+sns.set(style="whitegrid")
+
+# Load the data
+data = pd.read_csv("worlds_data.csv")
+
+# Only years after 2011
+data = data[data["year"] >= 2011]
+
+data["Picked_Top3"] = data["elim_pick"].apply(lambda x: 1 if x <= 2 and x != -1 else 0)
+
+dependent_variable = "norm_epa"
+start = 1200
+end = 2000
+scale = 1
+
+bin_width = 20
+
+probability_bins = []
+
+fifty_ten_2024_dep = 252
+
+plt.figure(figsize=(8, 5))
+
+# Prepare x values for bins
+x_values = list(range(start, end, bin_width))
+x_scaled = [x / scale for x in x_values]
+
+for dep in x_values:
+    epa_bin = data[
+        (data[dependent_variable] >= dep / scale)
+        & (data[dependent_variable] < dep / scale + bin_width / scale)
+    ]
+    epa_bin = epa_bin[["Picked_Top3"]]
+
+    total = len(epa_bin)
+    picked = len(epa_bin[epa_bin["Picked_Top3"] == 1])
+    if total == 0:
+        probability = 0
+    else:
+        probability = picked / total
+
+    probability_bins.append(probability)
+
+# Plot the binned probabilities
+plt.plot(x_scaled, probability_bins, marker="o", label="Binned Probability")
+
+# Perform linear regression
+slope, intercept, r_value, p_value, std_err = stats.linregress(
+    x_scaled, probability_bins
+)
+r_squared = r_value**2
+
+# Generate best-fit line
+x_fit = np.linspace(min(x_scaled), max(x_scaled), 100)
+y_fit = slope * x_fit + intercept
+plt.plot(
+    x_fit,
+    y_fit,
+    color="blue",
+    linestyle="-",
+    label=f"Best Fit Line (R²={r_squared:.2f})",
+)
+
+fifty_ten_performances = data[data["team"] == 5010]
+
+# Lines for 5010 dependent variable with label for year and label the value on the x-axis
+for year in fifty_ten_performances["year"]:
+    dep_value = fifty_ten_performances[fifty_ten_performances["year"] == year][
+        dependent_variable
+    ].values[0]
+    plt.axvline(x=dep_value / scale, color="red", linestyle="--", alpha=0.7)
+    plt.text(
+        dep_value / scale,
+        0.5,
+        str(year),
+        rotation=90,
+        verticalalignment="center",
+        color="red",
+        fontsize=8,
+    )
+
+plt.title("Percentage Robots Picked Top 3 by " + dependent_variable)
+plt.xlabel(dependent_variable)
+plt.ylabel("Percentage Picked Top 3")
+plt.legend()
+plt.tight_layout()
+plt.show()
